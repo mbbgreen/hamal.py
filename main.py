@@ -1,3 +1,5 @@
+pip install -r requirements.txt
+
 import random
 import json
 import os
