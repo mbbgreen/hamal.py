@@ -1,3 +1,7 @@
-pip install python
+random
+json
+os
+re
+requests
 python-telegram-bot==20.3
 transformers
