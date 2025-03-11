@@ -1,4 +1,3 @@
-pip install -r requirements.txt
 random
 json
 os
