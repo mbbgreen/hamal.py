@@ -130,7 +130,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def main():
     # جایگزین 'YOUR_TELEGRAM_BOT_TOKEN' با توکن واقعی ربات تلگرام شما
-    app = ApplicationBuilder().token("YOUR_TELEGRAM_BOT_TOKEN").build()
+    app = ApplicationBuilder().token("7473433081:AAH1ISzqMI1l6t6n_H9_JYvVfpvXj-Lzvik").build()
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
