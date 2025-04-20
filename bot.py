@@ -14,7 +14,7 @@ from telegram.ext import (
 )
 
 # ================= Bot configuration ===================
-BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"  # جایگزین با توکن واقعی
+BOT_TOKEN = "8102914320:AAGhC_xrDzZfVzRDyN8xErwtFdlVeuGkopI"  # جایگزین با توکن واقعی
 
 BOT_NAME = "چوپان"
 BOT_TRIGGERS = ["چوپان", "chopan", "shepherd"]
