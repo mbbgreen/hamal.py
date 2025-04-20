@@ -6,7 +6,7 @@ import schedule
 from telebot.types import Message
 
 # Bot configuration
-API_TOKEN = "YOUR_BOT_TOKEN"  # Replace with your bot token
+API_TOKEN = "8102914320:AAGhC_xrDzZfVzRDyN8xErwtFdlVeuGkopI"  # Replace with your bot token
 bot = telebot.TeleBot(API_TOKEN)
 
 # Bot name and trigger words
