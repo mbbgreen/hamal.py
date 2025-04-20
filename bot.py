@@ -5,7 +5,8 @@ import logging
 import random
 import asyncio
 
-from telegram import Update, ChatAction
+from telegram import Update
+from telegram import ChatAction
 from telegram.ext import (
     Application,
     CommandHandler,
