@@ -209,8 +209,11 @@ def main() -> None:
 
     logger.info("چوپان آماده است...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
-
 if __name__ == "__main__":
-    while True:
-        msg = input("کاربر: ")
-        print("چوپان:", generate_response(msg))
+    try:
+        while True:
+            msg = input("کاربر: ")
+            print("چوپان:", generate_response(msg))
+    except EOFError:
+        print("⚠️ ورودی قطع شد (EOF). برنامه متوقف شد.")
+
