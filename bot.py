@@ -1,13 +1,18 @@
-import telebot
-import time
+import logging
 import random
 import threading
-import schedule
-from telebot.types import Message
+import time
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+
+# Enable logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 # Bot configuration
-API_TOKEN = "8102914320:AAGhC_xrDzZfVzRDyN8xErwtFdlVeuGkopI"  # Replace with your bot token
-bot = telebot.TeleBot(API_TOKEN)
+BOT_TOKEN = "YOUR_BOT_TOKEN"  # Replace with your bot token
 
 # Bot name and trigger words
 BOT_NAME = "چوپان"
@@ -64,65 +69,92 @@ MENTION_RESPONSES = {
     ]
 }
 
-# Function to send random message to chat
-def send_random_message(chat_id):
-    message = random.choice(AUTO_MESSAGES)
-    bot.send_message(chat_id, message)
-
 # Dictionary to store chat IDs where the bot is active
 active_chats = {}
 
-# Handler for all messages
-@bot.message_handler(func=lambda message: True)
-def handle_all_messages(message: Message):
-    chat_id = message.chat.id
+# Function to send random message to chat
+async def send_random_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
+    message = random.choice(AUTO_MESSAGES)
+    await context.bot.send_message(chat_id=chat_id, text=message)
+
+# Start command handler
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send a message when the command /start is issued."""
+    user = update.effective_user
+    chat_id = update.effective_chat.id
+    
+    # Add chat to active chats
+    active_chats[chat_id] = True
+    
+    await update.message.reply_text(
+        f"چوپان اینجاست. کارت رو بگو."
+    )
+
+# Help command handler
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send a message when the command /help is issued."""
+    await update.message.reply_text("من چوپانم. وقتی اسمم رو صدا بزنی، میشنوم. همین.")
+
+# Function to respond when mentioned
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle the user message."""
+    chat_id = update.effective_chat.id
     
     # Add chat to active chats if it's not already there
     if chat_id not in active_chats:
         active_chats[chat_id] = True
     
     # Check if the bot's name is mentioned
-    if any(trigger.lower() in message.text.lower() for trigger in BOT_TRIGGERS):
-        respond_to_mention(message)
-
-# Function to respond when mentioned
-def respond_to_mention(message: Message):
-    # Determine the type of message
-    if any(greeting in message.text.lower() for greeting in ["سلام", "درود", "hi", "hello"]):
-        response_list = MENTION_RESPONSES["greeting"]
-    elif "?" in message.text or "؟" in message.text or any(q in message.text.lower() for q in ["چرا", "چطور", "کی", "کجا", "چه", "آیا"]):
-        response_list = MENTION_RESPONSES["question"]
-    else:
-        response_list = MENTION_RESPONSES["general"]
-    
-    # Select and send a random response
-    response = random.choice(response_list)
-    # Add a small delay to make it seem more natural
-    time.sleep(random.randint(1, 3))
-    bot.reply_to(message, response)
-
-# Schedule periodic messages for active chats
-def schedule_messages():
-    while True:
-        for chat_id in list(active_chats.keys()):
-            try:
-                send_random_message(chat_id)
-            except Exception as e:
-                print(f"Error sending to chat {chat_id}: {e}")
-                # If the bot has been removed from a chat, it might get an error
-                # Remove the chat from active chats if there's an error
-                active_chats.pop(chat_id, None)
+    if any(trigger.lower() in update.message.text.lower() for trigger in BOT_TRIGGERS):
+        # Determine the type of message
+        if any(greeting in update.message.text.lower() for greeting in ["سلام", "درود", "hi", "hello"]):
+            response_list = MENTION_RESPONSES["greeting"]
+        elif "?" in update.message.text or "؟" in update.message.text or any(q in update.message.text.lower() for q in ["چرا", "چطور", "کی", "کجا", "چه", "آیا"]):
+            response_list = MENTION_RESPONSES["question"]
+        else:
+            response_list = MENTION_RESPONSES["general"]
         
-        # Wait for 30 minutes (1800 seconds)
-        time.sleep(1800)
+        # Select and send a random response
+        response = random.choice(response_list)
+        # Add a small delay to make it seem more natural
+        await asyncio.sleep(random.randint(1, 3))
+        await update.message.reply_text(response)
+
+# Periodic message sender
+async def periodic_messages(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send messages to all active chats periodically."""
+    for chat_id in list(active_chats.keys()):
+        try:
+            await send_random_message(context, chat_id)
+        except Exception as e:
+            logger.error(f"Error sending to chat {chat_id}: {e}")
+            # If the bot has been removed from a chat, remove it from active chats
+            active_chats.pop(chat_id, None)
+
+# Function to schedule periodic messages through job queue
+def schedule_periodic_messages(application):
+    # Schedule the job every 30 minutes (1800 seconds)
+    application.job_queue.run_repeating(periodic_messages, interval=1800)
+
+# Main function to run the bot
+async def main() -> None:
+    """Start the bot."""
+    # Create the Application and pass it your bot's token
+    application = Application.builder().token(BOT_TOKEN).build()
+
+    # Add handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    # Schedule periodic messages
+    schedule_periodic_messages(application)
+
+    # Run the bot until the user presses Ctrl-C
+    await application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    # Start the scheduler in a separate thread
-    scheduler_thread = threading.Thread(target=schedule_messages)
-    scheduler_thread.daemon = True
-    scheduler_thread.start()
+    import asyncio
     
-    # Start the bot
     print("چوپان آماده است...")
-    bot.polling(none_stop=True)
-
+    asyncio.run(main())
