@@ -12,7 +12,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Bot configuration
-BOT_TOKEN = "YOUR_BOT_TOKEN"  # Replace with your bot token
+BOT_TOKEN = "8102914320:AAGhC_xrDzZfVzRDyN8xErwtFdlVeuGkopI"  # Replace with your bot token
 
 # Bot name and trigger words
 BOT_NAME = "چوپان"
