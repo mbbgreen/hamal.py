@@ -5,7 +5,7 @@ import logging
 import random
 import asyncio
 
-from telegram import Update, ChatAction
+from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -75,7 +75,6 @@ logger = logging.getLogger(__name__)
 
 async def send_random_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int, reply_to_message_id=None) -> None:
     message = random.choice(AUTO_MESSAGES)
-    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     await context.bot.send_message(
         chat_id=chat_id,
         text=message,
@@ -96,17 +95,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     message = update.message
     text = message.text or ""
 
-    # ثبت گروه/چت
     if chat_id not in active_chats:
         active_chats[chat_id] = True
     chat_messages.setdefault(chat_id, [])
     chat_messages[chat_id].append(message)
 
-    # فقط آخرین ۵۰ پیام رو نگه دار
     if len(chat_messages[chat_id]) > 50:
         chat_messages[chat_id] = chat_messages[chat_id][-50:]
 
-    # اگر اسم چوپان در پیام بود، ریپلای کن
     if any(trigger.lower() in text.lower() for trigger in BOT_TRIGGERS):
         lower = text.lower()
         if any(greet in lower for greet in ["سلام", "hi", "hello", "درود"]):
@@ -117,7 +113,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             responses = MENTION_RESPONSES["general"]
 
         response = random.choice(responses)
-        await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
         await message.reply_text(response)
 
 async def periodic_messages(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -133,18 +128,10 @@ async def periodic_messages(context: ContextTypes.DEFAULT_TYPE) -> None:
             active_chats.pop(chat_id, None)
 
 async def schedule_random_periodic_messages(app: Application) -> None:
-    # یک شیء ساده برای Context با دسترسی به bot
-    class Ctx:
-        def __init__(self, bot):
-            self.bot = bot
-
-    ctx = Ctx(app.bot)
-
     while True:
         interval = random.randint(300, 3600)  # بین ۵ دقیقه تا ۶۰ دقیقه
         await asyncio.sleep(interval)
-        # ارسال دوره‌ای پیام
-        await periodic_messages(ctx)
+        await periodic_messages(app)
 
 # ================= Main ===================
 
@@ -155,7 +142,6 @@ def main() -> None:
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # استارت تسک پس‌زمینه برای پیام‌های دوره‌ای
     asyncio.get_event_loop().create_task(schedule_random_periodic_messages(app))
 
     logger.info("چوپان آماده است...")
