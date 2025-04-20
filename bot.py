@@ -1,6 +1,6 @@
 import logging
 import random
-import threading
+import asyncio
 import time
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -73,14 +73,13 @@ MENTION_RESPONSES = {
 active_chats = {}
 
 # Function to send random message to chat
-async def send_random_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
+async def send_random_message(bot, chat_id: int) -> None:
     message = random.choice(AUTO_MESSAGES)
-    await context.bot.send_message(chat_id=chat_id, text=message)
+    await bot.send_message(chat_id=chat_id, text=message)
 
 # Start command handler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /start is issued."""
-    user = update.effective_user
     chat_id = update.effective_chat.id
     
     # Add chat to active chats
@@ -105,7 +104,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         active_chats[chat_id] = True
     
     # Check if the bot's name is mentioned
-    if any(trigger.lower() in update.message.text.lower() for trigger in BOT_TRIGGERS):
+    if update.message.text and any(trigger.lower() in update.message.text.lower() for trigger in BOT_TRIGGERS):
         # Determine the type of message
         if any(greeting in update.message.text.lower() for greeting in ["سلام", "درود", "hi", "hello"]):
             response_list = MENTION_RESPONSES["greeting"]
@@ -120,21 +119,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await asyncio.sleep(random.randint(1, 3))
         await update.message.reply_text(response)
 
-# Periodic message sender
-async def periodic_messages(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send messages to all active chats periodically."""
-    for chat_id in list(active_chats.keys()):
-        try:
-            await send_random_message(context, chat_id)
-        except Exception as e:
-            logger.error(f"Error sending to chat {chat_id}: {e}")
-            # If the bot has been removed from a chat, remove it from active chats
-            active_chats.pop(chat_id, None)
-
-# Function to schedule periodic messages through job queue
-def schedule_periodic_messages(application):
-    # Schedule the job every 30 minutes (1800 seconds)
-    application.job_queue.run_repeating(periodic_messages, interval=1800)
+# Periodic message sender function - runs in a separate coroutine
+async def periodic_message_sender(application):
+    """Send periodic messages to all active chats."""
+    while True:
+        # Wait for 30 minutes (1800 seconds)
+        await asyncio.sleep(1800)
+        
+        # Send a message to all active chats
+        for chat_id in list(active_chats.keys()):
+            try:
+                await send_random_message(application.bot, chat_id)
+            except Exception as e:
+                logger.error(f"Error sending to chat {chat_id}: {e}")
+                # If the bot has been removed from a chat, remove it from active chats
+                active_chats.pop(chat_id, None)
 
 # Main function to run the bot
 async def main() -> None:
@@ -147,14 +146,12 @@ async def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Schedule periodic messages
-    schedule_periodic_messages(application)
+    # Start periodic message sender as a background task
+    asyncio.create_task(periodic_message_sender(application))
 
     # Run the bot until the user presses Ctrl-C
     await application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    import asyncio
-    
     print("چوپان آماده است...")
     asyncio.run(main())
