@@ -5,7 +5,7 @@ import logging
 import random
 import asyncio
 
-await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+from telegram import Update, ChatAction
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -76,7 +76,11 @@ logger = logging.getLogger(__name__)
 async def send_random_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int, reply_to_message_id=None) -> None:
     message = random.choice(AUTO_MESSAGES)
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
-    await context.bot.send_message(chat_id=chat_id, text=message, reply_to_message_id=reply_to_message_id)
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=message,
+        reply_to_message_id=reply_to_message_id
+    )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
@@ -92,14 +96,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     message = update.message
     text = message.text or ""
 
+    # ثبت گروه/چت
     if chat_id not in active_chats:
         active_chats[chat_id] = True
     chat_messages.setdefault(chat_id, [])
     chat_messages[chat_id].append(message)
 
+    # فقط آخرین ۵۰ پیام رو نگه دار
     if len(chat_messages[chat_id]) > 50:
-        chat_messages[chat_id] = chat_messages[chat_id][-50:]  # فقط آخرین ۵۰ پیام رو نگه دار
+        chat_messages[chat_id] = chat_messages[chat_id][-50:]
 
+    # اگر اسم چوپان در پیام بود، ریپلای کن
     if any(trigger.lower() in text.lower() for trigger in BOT_TRIGGERS):
         lower = text.lower()
         if any(greet in lower for greet in ["سلام", "hi", "hello", "درود"]):
@@ -118,20 +125,26 @@ async def periodic_messages(context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             reply_to = None
             if chat_messages.get(chat_id) and random.random() < 0.4:
-                message = random.choice(chat_messages[chat_id])
-                reply_to = message.message_id
+                msg = random.choice(chat_messages[chat_id])
+                reply_to = msg.message_id
             await send_random_message(context, chat_id, reply_to_message_id=reply_to)
         except Exception as e:
             logger.error(f"Error sending to chat {chat_id}: {e}")
             active_chats.pop(chat_id, None)
 
-async def schedule_random_periodic_messages(application: Application) -> None:
-    async def loop():
-        while True:
-            await asyncio.sleep(random.randint(300, 3600))  # ۵ تا ۶۰ دقیقه
-            await periodic_messages(application)
+async def schedule_random_periodic_messages(app: Application) -> None:
+    # یک شیء ساده برای Context با دسترسی به bot
+    class Ctx:
+        def __init__(self, bot):
+            self.bot = bot
 
-    asyncio.create_task(loop())
+    ctx = Ctx(app.bot)
+
+    while True:
+        interval = random.randint(300, 3600)  # بین ۵ دقیقه تا ۶۰ دقیقه
+        await asyncio.sleep(interval)
+        # ارسال دوره‌ای پیام
+        await periodic_messages(ctx)
 
 # ================= Main ===================
 
@@ -142,13 +155,11 @@ def main() -> None:
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
+    # استارت تسک پس‌زمینه برای پیام‌های دوره‌ای
     asyncio.get_event_loop().create_task(schedule_random_periodic_messages(app))
 
     logger.info("چوپان آماده است...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
-
-if __name__ == "__main__":
-    main()
 
 if __name__ == "__main__":
     main()
