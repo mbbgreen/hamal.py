@@ -1,24 +1,24 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import logging
 import random
-import asyncio
-import time
+
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-
-# Enable logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
+from telegram.ext import (
+    Application, 
+    CommandHandler, 
+    MessageHandler, 
+    filters, 
+    ContextTypes
 )
-logger = logging.getLogger(__name__)
 
-# Bot configuration
-BOT_TOKEN = "8102914320:AAGhC_xrDzZfVzRDyN8xErwtFdlVeuGkopI"  # Replace with your bot token
+# ================= Bot configuration ===================
+BOT_TOKEN = "8102914320:AAGhC_xrDzZfVzRDyN8xErwtFdlVeuGkopI"  # جایگزین با توکن شما
 
-# Bot name and trigger words
 BOT_NAME = "چوپان"
 BOT_TRIGGERS = ["چوپان", "chopan", "shepherd"]
 
-# Random automated messages (with ISTP personality - logical, reserved but occasionally witty)
 AUTO_MESSAGES = [
     "فقط میخواستم بگم که گوسفندا رو شمردم، همه سر جاشون هستن.",
     "گاهی سکوت، بهترین پاسخه.",
@@ -35,7 +35,6 @@ AUTO_MESSAGES = [
     "گله ساکته، یا من دارم کر میشم؟"
 ]
 
-# Responses when bot is mentioned (cool, logical, slightly sarcastic - ISTP style)
 MENTION_RESPONSES = {
     "general": [
         "بله؟ کاری داشتی؟",
@@ -67,91 +66,84 @@ MENTION_RESPONSES = {
         "به نظرت من همه چیز رو می‌دونم؟",
         "سوال خوبیه. جوابش رو وقتی پیدا کردم بهت میگم."
     ]
-}
+]
 
-# Dictionary to store chat IDs where the bot is active
-active_chats = {}
+# نگهداری چت‌های فعال
+active_chats: dict[int, bool] = {}
 
-# Function to send random message to chat
-async def send_random_message(bot, chat_id: int) -> None:
+# ================= Logging setup ===================
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", 
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# =============== Bot Handlers ===================
+
+async def send_random_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
     message = random.choice(AUTO_MESSAGES)
-    await bot.send_message(chat_id=chat_id, text=message)
+    await context.bot.send_message(chat_id=chat_id, text=message)
 
-# Start command handler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when the command /start is issued."""
     chat_id = update.effective_chat.id
-    
-    # Add chat to active chats
     active_chats[chat_id] = True
-    
-    await update.message.reply_text(
-        f"چوپان اینجاست. کارت رو بگو."
-    )
+    await update.message.reply_text("چوپان اینجاست. کارت رو بگو.")
 
-# Help command handler
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when the command /help is issued."""
     await update.message.reply_text("من چوپانم. وقتی اسمم رو صدا بزنی، میشنوم. همین.")
 
-# Function to respond when mentioned
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle the user message."""
     chat_id = update.effective_chat.id
+    text = update.message.text or ""
     
-    # Add chat to active chats if it's not already there
     if chat_id not in active_chats:
         active_chats[chat_id] = True
-    
-    # Check if the bot's name is mentioned
-    if update.message.text and any(trigger.lower() in update.message.text.lower() for trigger in BOT_TRIGGERS):
-        # Determine the type of message
-        if any(greeting in update.message.text.lower() for greeting in ["سلام", "درود", "hi", "hello"]):
-            response_list = MENTION_RESPONSES["greeting"]
-        elif "?" in update.message.text or "؟" in update.message.text or any(q in update.message.text.lower() for q in ["چرا", "چطور", "کی", "کجا", "چه", "آیا"]):
-            response_list = MENTION_RESPONSES["question"]
+
+    if any(trigger.lower() in text.lower() for trigger in BOT_TRIGGERS):
+        # تعیین نوع پاسخ
+        lower = text.lower()
+        if any(greet in lower for greet in ["سلام", "درود", "hi", "hello"]):
+            responses = MENTION_RESPONSES["greeting"]
+        elif "?" in text or "؟" in text or any(q in lower for q in ["چرا", "چطور", "کی", "کجا", "چه", "آیا"]):
+            responses = MENTION_RESPONSES["question"]
         else:
-            response_list = MENTION_RESPONSES["general"]
-        
-        # Select and send a random response
-        response = random.choice(response_list)
-        # Add a small delay to make it seem more natural
-        await asyncio.sleep(random.randint(1, 3))
-        await update.message.reply_text(response)
+            responses = MENTION_RESPONSES["general"]
 
-# Periodic message sender function - runs in a separate coroutine
-async def periodic_message_sender(application):
-    """Send periodic messages to all active chats."""
-    while True:
-        # Wait for 30 minutes (1800 seconds)
-        await asyncio.sleep(1800)
-        
-        # Send a message to all active chats
-        for chat_id in list(active_chats.keys()):
-            try:
-                await send_random_message(application.bot, chat_id)
-            except Exception as e:
-                logger.error(f"Error sending to chat {chat_id}: {e}")
-                # If the bot has been removed from a chat, remove it from active chats
-                active_chats.pop(chat_id, None)
+        response = random.choice(responses)
+        await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+        await context.bot.send_message(chat_id=chat_id, text=response)
 
-# Main function to run the bot
-async def main() -> None:
-    """Start the bot."""
-    # Create the Application and pass it your bot's token
-    application = Application.builder().token(BOT_TOKEN).build()
+async def periodic_messages(context: ContextTypes.DEFAULT_TYPE) -> None:
+    for chat_id in list(active_chats.keys()):
+        try:
+            await send_random_message(context, chat_id)
+        except Exception as e:
+            logger.error(f"Error sending to chat {chat_id}: {e}")
+            active_chats.pop(chat_id, None)
 
-    # Add handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+def schedule_periodic_messages(application: Application) -> None:
+    # هر ۳۰ دقیقه یک بار پیام ارسال کن
+    application.job_queue.run_repeating(periodic_messages, interval=1800, first=0)
 
-    # Start periodic message sender as a background task
-    asyncio.create_task(periodic_message_sender(application))
+# ================= Main ===================
 
-    # Run the bot until the user presses Ctrl-C
-    await application.run_polling(allowed_updates=Update.ALL_TYPES)
+def main() -> None:
+    """Start the bot (synchronous entry point)."""
+    app = Application.builder() \
+        .token(BOT_TOKEN) \
+        .build()
+
+    # ثبت handlerها
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    # زمان‌بندی پیام‌های دوره‌ای
+    schedule_periodic_messages(app)
+
+    logger.info("چوپان آماده است...")
+    # این متد خودش event loop می‌سازد، initialize و shutdown را با await داخلی صدا می‌زند
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    print("چوپان آماده است...")
-    asyncio.run(main())
+    main()
