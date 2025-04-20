@@ -5,8 +5,7 @@ import logging
 import random
 import asyncio
 
-from telegram import Update
-from telegram import ChatAction
+await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
 from telegram.ext import (
     Application,
     CommandHandler,
