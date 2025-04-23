@@ -15,7 +15,7 @@ from telegram.ext import (
 BOT_TOKEN = "8102914320:AAGhC_xrDzZfVzRDyN8xErwtFdlVeuGkopI"
 
 # یوزرنیم باتت رو دقیق اینجا قرار بده (با @)
-BOT_USERNAME = "@chopan_bot"
+BOT_USERNAME = "@choponvip_bot"
 
 BOT_NAME = "چوپان"
 BOT_TRIGGERS = ["چوپان", "chopan", "shepherd"]
@@ -170,10 +170,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     # ۳) تشخیص منشن با آیدی بات
     is_bot_mentioned = any(
-    e.type == "mention" and message.text[e.offset:e.offset + e.length].lower() == "@choponvip_bot"
-    for e in entities
-)
-
+        e.type == "mention" and message.text[e.offset:e.offset + e.length].lower() == BOT_USERNAME.lower()
+        for e in entities
+    )
 
     # ۴) یا اسم بات تو متن اومده
     if is_bot_mentioned or any(trigger in text for trigger in BOT_TRIGGERS):
