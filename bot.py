@@ -2,7 +2,7 @@ import logging
 import random
 import asyncio
 
-from telegram import Update
+from telegram import Update, MessageEntity
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -13,14 +13,13 @@ from telegram.ext import (
 
 # ================= Bot configuration ===================
 BOT_TOKEN = "8102914320:AAGhC_xrDzZfVzRDyN8xErwtFdlVeuGkopI"
-
-# یوزرنیم باتت رو دقیق اینجا قرار بده (با @)
+# یوزرنیم بات‌ت رو اینجا با @ بنویس
 BOT_USERNAME = "@choponvip_bot"
 
-BOT_NAME = "چوپان"
+# کلمه‌هایی که به عنوان تریگر منشن بررسی می‌شوند
 BOT_TRIGGERS = ["چوپان", "chopan", "shepherd"]
 
-# ============ پیام‌های دوره‌ای خودکار =============
+# ============ پیام‌های دوره‌ای خودکار ============
 AUTO_MESSAGES = [
     "💀 دوباره اومدم سرک بکشم ببینم اوضاع چطوره…",
     "😂 دارم با خودم حرف می‌زنم، ولی خب بد نیست دوستان هم بشنون!",
@@ -44,7 +43,7 @@ AUTO_MESSAGES = [
     "🔔 زنگ خطر: بدون میم نپرس!",
 ]
 
-# ============ واکنش به ریپلای‌ها =============
+# ============ واکنش به ریپلای‌ها ============
 REPLY_RESPONSES = [
     "😂😂😂",
     "💀 اسکلت خودمم خندید!",
@@ -115,7 +114,32 @@ KEYWORD_RESPONSES = {
     # … تا ۵۰ کلمه و ۱۵۰ جواب
 }
 
-# نگهداری چت‌های فعال و پیام‌های اخیر
+# پاسخ‌های منشن (سلام / سؤال / عمومی)
+MENTION_RESPONSES = {
+    "general": [
+        "چی شده؟ صدام زدی یا صرفا اومدی استاتوس بذاری؟",
+        "اینجام چون چوبم گم نشده، ولی حال خوشه!",
+        "بازم یکی اسممو گفت، الان 10K سنسور رفت!",
+        "یه چوپان واقعی از اینجا رد شده بود، این فقط کپی‌پسته.",
+        "داره میشه شبیه استریم Twitch، همه ناظر هستن!",
+    ],
+    "greeting": [
+        "سلام گوسفند من! چطوری؟",
+        "Hey bro! صبح بخیر.",
+        "درود، ولی کدوم سرور؟",
+        "سلام سلام، سبکت تازه‌اس؟",
+        "سلامتی‌ات چطوره؟ چای و قهوه آماده‌س؟",
+    ],
+    "question": [
+        "اوه سوال؟ مگه تو quiz هستیم؟",
+        "نپرس، فقط vibe رو نگه دار.",
+        "تو بپرس، من جوابم مثل memecoin بی‌ثباته.",
+        "این سوال رو باید از گوسفند بعدی بپرسی.",
+        "چرا؟ چون میشه. پایان داستان!",
+    ],
+}
+
+# ============ وضعیت چت‌ها ============
 active_chats: dict[int, bool] = {}
 chat_messages: dict[int, list] = {}
 
@@ -127,7 +151,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # =============== Bot Handlers ===================
-async def send_random_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int, reply_to_message_id=None) -> None:
+async def send_random_message(
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int,
+    reply_to_message_id=None
+) -> None:
     msg = random.choice(AUTO_MESSAGES)
     await context.bot.send_message(
         chat_id=chat_id,
@@ -157,7 +185,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if len(chat_messages[chat_id]) > 50:
         chat_messages[chat_id] = chat_messages[chat_id][-50:]
 
-    # ۱) ریپلای روی پیام بات
+    # ۱) واکنش به ریپلای روی پیام بات
     if message.reply_to_message and message.reply_to_message.from_user.is_bot:
         await message.reply_text(random.choice(REPLY_RESPONSES))
         return
@@ -168,15 +196,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await message.reply_text(random.choice(replies))
             return
 
-    # ۳) تشخیص منشن با آیدی بات
+    # ۳) تشخیص منشن با @username
     is_bot_mentioned = any(
-        e.type == "mention" and message.text[e.offset:e.offset + e.length].lower() == BOT_USERNAME.lower()
-        for e in entities
+        ent.type == MessageEntity.MENTION and
+        message.text[ent.offset : ent.offset + ent.length].lower() == BOT_USERNAME.lower()
+        for ent in entities
     )
 
-    # ۴) یا اسم بات تو متن اومده
-    if is_bot_mentioned or any(trigger in text for trigger in BOT_TRIGGERS):
-        # تشخیص سلام/سوال/عمومی
+    # ۴) یا اسم بات داخل متن اومده
+    if is_bot_mentioned or any(trig in text for trig in BOT_TRIGGERS):
         if any(g in text for g in ["سلام", "hi", "hello", "درود"]):
             pool = MENTION_RESPONSES["greeting"]
         elif any(q in text for q in ["?", "؟", "چرا", "چطور", "کی", "کجا", "چه", "آیا"]):
@@ -192,15 +220,14 @@ async def periodic_messages(context: ContextTypes.DEFAULT_TYPE) -> None:
             if chat_messages.get(chat_id) and random.random() < 0.5:
                 msg = random.choice(chat_messages[chat_id])
                 reply_to = msg.message_id
-            await send_random_message(context, chat_id, reply_to_message_id=reply_to)
+            await send_random_message(context, chat_id, reply_to)
         except Exception as e:
             logger.error(f"Error in periodic_messages for {chat_id}: {e}")
             active_chats.pop(chat_id, None)
 
 async def schedule_random_periodic_messages(app: Application) -> None:
     while True:
-        # هر ۵ تا ۶۰ دقیقه یه بار
-        interval = random.randint(300, 3600)
+        interval = random.randint(300, 3600)  # بین ۵ دقیقه تا ۶۰ دقیقه
         await asyncio.sleep(interval)
         await periodic_messages(app)
 
@@ -211,7 +238,7 @@ def main() -> None:
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # شروع تسک دوره‌ای
+    # شروع تسک پیام‌های دوره‌ای
     asyncio.get_event_loop().create_task(schedule_random_periodic_messages(app))
 
     logger.info("چوپان آماده است…")
