@@ -40,6 +40,21 @@ REPLY_RESPONSES = [
     "💀 اومدم از شدت خنده بمیرم!",
 ]
 
+# پاسخ‌های مرتبط با کلمات کلیدی (50 کلمه، هر کلمه 3 جواب)
+KEYWORD_RESPONSES = {
+    "مامان": ["اره مامان دارم.", "مامانم همیشه پشتمه!", "مامان معنی مهربونی فارغ از هر چیزیه."],
+    "پدر": ["پدر منم مثل کوه پشتمه.", "پدر چشمه انرژیه.", "پدر تو زندگی خیلی مهمه."],
+    "عشق": ["عشق موتوره همه‌ی کائناته.", "عشق باشه زندگی رو دوس داریم.", "بدون عشق همه چی بی‌معنیه."],
+    "دوست": ["دوست واقعی کمیابه.", "دوست یعنی کسی که وسط طوفان باشه.", "دوست خوب مثل گوهره."],
+    "خواب": ["خواب سلطان سلامتیه.", "خواب نیازه مث آب و غذا.", "خواب کم یعنی خرابی سیستم."],
+    "کار": ["کار کن، پول در بیار.", "کار کردن گاهی خوشحاله.", "کار بدون عشق بی‌معنیه."],
+    "بازی": ["بازی همون آرامشه.", "بازی بدون سرگرمی سخته.", "بازی روحیه رو قوی می‌کنه."],
+    "کتاب": ["کتاب بهترین دوسته.", "کتاب خونه آدمه.", "کتاب خونده باشی، آدم دیگه نمی‌شه."],
+    "قهوه": ["قهوه صبح جان میده.", "بی‌قهوه مثل ابر بی بارونه.", "قهوه بی‌شک حیرانه."],
+    "چای": ["چای مثل آغوشه.", "چای بهونه دورهمیه.", "چای حالا حالا ادامه داره."],
+    # ... ادامه تا 50 کلمه
+}
+
 # جداول پاسخ‌ها به منشن با دیالوگ‌های به‌روز و میم‌های فارسی-انگلیسی
 MENTION_RESPONSES = {
     "general": [
@@ -97,7 +112,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
     message = update.message
-    text = message.text or ""
+    text = (message.text or "").lower()
+    entities = message.entities or []
 
     # ثبت فعالیت چت
     if chat_id not in active_chats:
@@ -113,18 +129,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await message.reply_text(reaction)
         return
 
-    # وقتی اسم بات رو میارن
-    if any(trigger.lower() in text.lower() for trigger in BOT_TRIGGERS):
-        lower = text.lower()
-        if any(greet in lower for greet in ["سلام", "hi", "hello", "درود"]):
+    # واکنش به کلمات کلیدی
+    for keyword, replies in KEYWORD_RESPONSES.items():
+        if keyword in text:
+            await message.reply_text(random.choice(replies))
+            return
+
+    # بررسی mention آیدی بات در message entities
+    is_bot_mentioned = any(
+        e.type == "mention" and message.text[e.offset:e.offset + e.length].lower() == "@choponvip_bot"
+        for e in entities
+    )
+
+    # یا اگر اسم یا کلمه کلیدی بات داخل متن بود
+    if is_bot_mentioned or any(trigger in text for trigger in BOT_TRIGGERS):
+        if any(greet in text for greet in ["سلام", "hi", "hello", "درود"]):
             responses = MENTION_RESPONSES["greeting"]
-        elif "?" in text or "؟" in text or any(q in lower for q in ["چرا", "چطور", "کی", "کجا", "چه", "آیا"]):
+        elif any(q in text for q in ["?", "؟", "چرا", "چطور", "کی", "کجا", "چه", "آیا"]):
             responses = MENTION_RESPONSES["question"]
         else:
             responses = MENTION_RESPONSES["general"]
 
-        response = random.choice(responses)
-        await message.reply_text(response)
+        await message.reply_text(random.choice(responses))
+
 
 async def periodic_messages(context: ContextTypes.DEFAULT_TYPE) -> None:
     for chat_id in list(active_chats.keys()):
@@ -145,6 +172,7 @@ async def schedule_random_periodic_messages(app: Application) -> None:
         await periodic_messages(app)
 
 # ================= Main ===================
+
 
 def main() -> None:
     app = Application.builder().token(BOT_TOKEN).build()
