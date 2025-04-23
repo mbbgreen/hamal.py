@@ -170,9 +170,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     # ۳) تشخیص منشن با آیدی بات
     is_bot_mentioned = any(
-        e.type == "mention" and message.text[e.offset:e.offset + e.length].lower() == choponvip_bot.lower()
-        for e in entities
-    )
+    e.type == "mention" and message.text[e.offset:e.offset + e.length].lower() == "@choponvip_bot"
+    for e in entities
+)
+
 
     # ۴) یا اسم بات تو متن اومده
     if is_bot_mentioned or any(trigger in text for trigger in BOT_TRIGGERS):
